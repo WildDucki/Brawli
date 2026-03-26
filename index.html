@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Brawl Tracker</title>
+<style>
+body { font-family:sans-serif; background:#0f1923; color:#fff; }
+input, button { padding:8px; margin:4px; border-radius:4px; }
+.battles { margin-top:20px; }
+.battle { padding:10px; border:1px solid #555; margin-bottom:6px; border-radius:6px; }
+</style>
+</head>
+<body>
+
+<h1>Brawl Tracker</h1>
+<input id="ti" type="text" placeholder="Gib Tag ein, z.B. 2PP"/>
+<button id="sb" onclick="go()">Suchen</button>
+
+<div id="em" style="color:#f55;margin-top:10px;"></div>
+<div id="ct" class="battles"></div>
+
+<script>
+// --- Helpers ---
+function getValidTag(raw) {
+  const t = raw.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(!t) throw new Error("Ungültiger Tag");
+  return t;
+}
+
+// --- Fetch data from Worker ---
+async function fetchData(tag) {
+  const url = "https://young-sun-4d1e.robloxstor0110.workers.dev" + encodeURIComponent(tag);
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("API Fehler");
+  return res.json();
+}
+
+// --- Show error ---
+function showErr(msg) { document.getElementById('em').textContent = "⚠️ " + msg; }
+function hideErr() { document.getElementById('em').textContent = ""; }
+
+// --- Main ---
+async function go() {
+  hideErr();
+  document.getElementById('ct').innerHTML = "Lädt...";
+  try {
+    const raw = document.getElementById('ti').value;
+    const tag = getValidTag(raw);
+
+    const data = await fetchData(tag);
+    const pl = data.player;
+    const battles = data.battles.slice(0,100); // last 100 battles
+
+    if(!pl) throw new Error("Spieler nicht gefunden");
+
+    // --- Render ---
+    let html = `<h2>${pl.name} (${pl.tag})</h2>
+                <div>Trophäen: ${pl.trophies}</div>
+                <div>Höchste: ${pl.highestTrophies || '-'}</div>
+                <div>Level: ${pl.expLevel}</div>
+                <h3>Letzte Spiele (${battles.length})</h3>`;
+
+    if(battles.length === 0) html += "<div>Keine Battle-Logs</div>";
+    else {
+      html += battles.map(b=>{
+        const r = b.battle?.result || 'unentschieden';
+        const mode = b.event?.mode || 'unknown';
+        const map = b.event?.map || '';
+        const tc = b.battle?.trophyChange ?? 0;
+        return `<div class="battle">
+                  <strong>${mode}</strong> ${map} → ${r.toUpperCase()} (ΔTrophäen: ${tc})
+                </div>`;
+      }).join('');
+    }
+
+    document.getElementById('ct').innerHTML = html;
+
+  } catch(e) {
+    document.getElementById('ct').innerHTML = "";
+    showErr(e.message);
+  }
+}
+</script>
+
+</body>
+</html>
