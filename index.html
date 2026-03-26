@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Brawl Tracker</title>
+</head>
+
+<body style="background:#111;color:#fff;font-family:sans-serif;padding:20px">
+
+<h1>Brawl Tracker</h1>
+
+<input id="tag" placeholder="Enter Tag (e.g. 2PP)" />
+<button onclick="go()">Search</button>
+
+<div id="out" style="margin-top:20px"></div>
+
+<script>
+const WORKER_URL = "https://young-sun-4d1e.robloxstor0110.workers.dev"; // 🔥 CHANGE THIS
+
+function cleanTag(t) {
+  return t.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+async function go() {
+  const raw = document.getElementById("tag").value;
+  const tag = cleanTag(raw);
+
+  if (!tag) {
+    document.getElementById("out").innerHTML = "❌ Invalid tag";
+    return;
+  }
+
+  document.getElementById("out").innerHTML = "Loading...";
+
+  try {
+    const res = await fetch(`${WORKER_URL}?tag=${tag}`);
+
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error("Worker error: " + txt);
+    }
+
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    const player = data.player;
+    let battles = data.battles;
+
+    // ✅ STORAGE (100 matches)
+    const key = "b_" + tag;
+    const stored = JSON.parse(localStorage.getItem(key) || "[]");
+
+    const map = new Map();
+
+    [...battles, ...stored].forEach(b => {
+      if (b?.battleTime) map.set(b.battleTime, b);
+    });
+
+    const merged = Array.from(map.values())
+      .sort((a,b)=>b.battleTime.localeCompare(a.battleTime))
+      .slice(0,100);
+
+    localStorage.setItem(key, JSON.stringify(merged));
+
+    render(player, merged);
+
+  } catch (e) {
+    document.getElementById("out").innerHTML = "❌ " + e.message;
+  }
+}
+
+function render(p, battles) {
+  let html = `
+    <h2>${p.name}</h2>
+    <div>🏆 ${p.trophies}</div>
+    <hr>
+  `;
+
+  if (!battles.length) {
+    html += "No battles";
+  } else {
+    battles.forEach(b => {
+      html += `
+        <div style="margin-bottom:10px">
+          ${b.event?.mode || "?"} - ${b.battle?.result || "?"}<br>
+          ${b.battleTime}
+        </div>
+      `;
+    });
+  }
+
+  document.getElementById("out").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
